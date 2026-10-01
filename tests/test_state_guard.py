@@ -3,7 +3,9 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+import codecs
 import state_guard as guard
+from state_guard_json import decode, render
 
 
 class StateGuardTests(unittest.TestCase):
@@ -54,6 +56,34 @@ class StateGuardTests(unittest.TestCase):
     def test_reports_hide_config_values(self):
         self.path.write_text('{"secret": "private"}')
         self.assertNotIn("private", json.dumps(guard.inspect_config(self.path, {"secret": "expected"})[2]))
+
+    def test_render_empty_object_no_edits(self):
+        raw = b'{}'
+        config = decode(raw)
+        # No settings to change; should return identical bytes
+        self.assertEqual(render(raw, config, {}), b'{}')
+        # Missing keys without opt-in must fail closed
+        with self.assertRaisesRegex(ValueError, "allow-reformat"):
+            render(raw, config, {"newkey": True})
+
+    def test_render_empty_object_with_reformat(self):
+        raw = b'{}'
+        config = decode(raw)
+        out = render(raw, config, {"newkey": True}, allow_reformat=True)
+        self.assertEqual(json.loads(out), {"newkey": True})
+
+    def test_render_bom_whitespace_preserved(self):
+        raw = codecs.BOM_UTF8 + b'  { "debug" : true }  '
+        config = decode(raw)
+        out = render(raw, config, {"debug": False})
+        # BOM preserved, whitespace outside edited value preserved
+        self.assertTrue(out.startswith(codecs.BOM_UTF8))
+        self.assertIn(b'  { "debug" : false }  ', out)
+
+    def test_render_whitespace_only_object(self):
+        raw = b'  {\n  }  '
+        config = decode(raw)
+        self.assertEqual(render(raw, config, {}), raw)
 
 
 if __name__ == "__main__":

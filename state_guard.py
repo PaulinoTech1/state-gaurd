@@ -28,7 +28,11 @@ def format_check(check):
 def command(args):
     result = subprocess.run(args, capture_output=True, text=True, timeout=20)
     if result.returncode:
-        raise ValueError("collector failed; check permissions and command availability")
+        detail = (result.stderr or "").strip().replace("\n", " ")
+        if len(detail) > 200:
+            detail = detail[:200] + "..."
+        suffix = f": {detail}" if detail else ""
+        raise ValueError(f"collector failed (exit {result.returncode}); check permissions and command availability{suffix}")
     return result.stdout.strip()
 
 
@@ -43,7 +47,10 @@ def endpoint_checks():
         for name, script, passes in collectors:
             try:
                 value = json.loads(command(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; " + script]))
-                checks.append({"check": name, "status": "pass" if passes(value) else "drift", "observed": value})
+                if value is None:
+                    checks.append({"check": name, "status": "unknown", "detail": "Collector returned no data; check installed components."})
+                else:
+                    checks.append({"check": name, "status": "pass" if passes(value) else "drift", "observed": value})
             except (OSError, ValueError, subprocess.TimeoutExpired):
                 checks.append({"check": name, "status": "unknown", "detail": "Unable to collect; check permissions or installed components."})
     elif system == "Linux":

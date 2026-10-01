@@ -37,13 +37,28 @@ def main():
     results = queue.Queue()
     busy = False
     closing = False
+    # Preview enforcement: Apply requires a successful Preview for the current selection.
+    preview_state = {"policy": None, "config": None, "reformat": None, "done": False}
+    last_action = None
+    pending_preview_selection = None
+
+    def current_selection():
+        return (paths["Policy"].get(), paths["Config"].get(), allow_reformat.get())
+
+    def invalidate_preview(*args):
+        preview_state["done"] = False
+    # Any change to the selection invalidates a prior preview.
+    paths["Policy"].trace_add("write", invalidate_preview)
+    paths["Config"].trace_add("write", invalidate_preview)
+    allow_reformat.trace_add("write", invalidate_preview)
+
     def show(text):
         output.configure(state="normal")
         output.delete("1.0", "end")
         output.insert("end", text)
         output.configure(state="disabled")
     def run(action):
-        nonlocal busy
+        nonlocal busy, last_action, pending_preview_selection
         policy, config = paths["Policy"].get(), paths["Config"].get()
         reformat = allow_reformat.get()
         if action in ("rollback-preview", "rollback") and not config:
@@ -52,11 +67,18 @@ def main():
         if action not in ("endpoint", "rollback-preview", "rollback") and (not policy or not config):
             messagebox.showerror("Select files", "Choose a policy and an existing JSON config.")
             return
-        if action == "apply" and not messagebox.askyesno("Apply policy?", "Updates the selected JSON config and creates private recovery files. Review Preview first." + (" Full JSON formatting will change." if reformat else " Unmanaged bytes stay intact.") + " Continue?"):
-            return
+        if action == "apply":
+            sel = (policy, config, reformat)
+            if not (preview_state["done"] and (preview_state["policy"], preview_state["config"], preview_state["reformat"]) == sel):
+                messagebox.showerror("Preview required", "Run Preview first for the current policy and config, then review the output before applying.")
+                return
+            if not messagebox.askyesno("Apply policy?", "Updates the selected JSON config and creates private recovery files." + (" Full JSON formatting will change." if reformat else " Unmanaged bytes stay intact.") + " Continue?"):
+                return
         if action == "rollback" and not messagebox.askyesno("Restore recovery copy?", "Restore the original bytes? Newer or unrecognized config changes will be refused. Review Preview rollback first."):
             return
         busy = True
+        last_action = action
+        pending_preview_selection = (policy, config, reformat) if action == "preview" else None
         for button in controls:
             button.configure(state="disabled")
         show("Checking…")
@@ -74,6 +96,8 @@ def main():
                     text += "\n\nPreview only. No files changed."
                 if action == "apply":
                     text += "\n\nSettings verified. A recovery copy was created if changes were needed."
+                    # Applying changes the config; require a fresh preview next time.
+                    preview_state["done"] = False
                 if action == "rollback":
                     text += "\n\nOriginal bytes restored or already present. Recovery files retained."
             except (OSError, ValueError) as exc:
@@ -81,13 +105,21 @@ def main():
             results.put(text)
         threading.Thread(target=worker, daemon=False).start()
     def poll():
-        nonlocal busy
+        nonlocal busy, last_action, pending_preview_selection
         try:
             text = results.get_nowait()
         except queue.Empty:
             pass
         else:
             busy = False
+            # Record successful preview for the selection that was previewed.
+            if last_action == "preview" and pending_preview_selection and not text.startswith("Error:"):
+                pol, cfg, ref = pending_preview_selection
+                preview_state["policy"] = pol
+                preview_state["config"] = cfg
+                preview_state["reformat"] = ref
+                preview_state["done"] = True
+            pending_preview_selection = None
             if closing:
                 root.destroy()
                 return
