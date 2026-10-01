@@ -121,8 +121,8 @@ still need acceptance testing on representative endpoints. Tests do not establis
 that an endpoint is secure.
 
 [Dependency/release status](DEPENDENCIES.md) records external runtimes and the
-unsigned commit history. [Licensing is pending](LICENSING.md); no open-source
-license grant is claimed. The display name is State Guard; the existing GitHub slug
+unsigned commit history. Licensed under the [MIT License](LICENSE); see
+[licensing](LICENSING.md). The display name is State Guard; the existing GitHub slug
 `state-gaurd` is retained. The prototype does not claim safe OS remediation.
 
 A [source-only SPDX inventory](sbom.spdx.json) records file hashes and the absence

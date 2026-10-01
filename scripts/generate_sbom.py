@@ -25,18 +25,18 @@ def build(created):
         files.append({"SPDXID": f"SPDXRef-File-{index}", "fileName": "./" + name,
                       "checksums": [{"algorithm": "SHA1", "checksumValue": hashlib.sha1(raw).hexdigest()},
                                     {"algorithm": "SHA256", "checksumValue": hashlib.sha256(raw).hexdigest()}],
-                      "licenseConcluded": "NOASSERTION", "licenseInfoInFiles": ["NOASSERTION"],
-                      "copyrightText": "NOASSERTION"})
+                      "licenseConcluded": "MIT", "licenseInfoInFiles": ["MIT"],
+                      "copyrightText": "Copyright (c) 2026 PaulinoTech1"})
     verification = hashlib.sha1("".join(sorted(f["checksums"][0]["checksumValue"] for f in files)).encode("ascii")).hexdigest()
     return {"spdxVersion": "SPDX-2.3", "dataLicense": "CC0-1.0", "SPDXID": "SPDXRef-DOCUMENT",
             "name": "State Guard source inventory",
             "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/" + __version__ + "-" + verification,
             "creationInfo": {"creators": ["Tool: State Guard source inventory generator"], "created": created},
-            "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensing is unasserted pending owner selection.",
+            "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensed under MIT.",
             "packages": [{"name": "State Guard", "SPDXID": "SPDXRef-StateGuard", "versionInfo": __version__,
                           "downloadLocation": "https://github.com/PaulinoTech1/state-gaurd",
                           "filesAnalyzed": True, "packageVerificationCode": {"packageVerificationCodeValue": verification},
-                          "licenseConcluded": "NOASSERTION", "licenseDeclared": "NOASSERTION", "copyrightText": "NOASSERTION"}],
+                          "licenseConcluded": "MIT", "licenseDeclared": "MIT", "copyrightText": "Copyright (c) 2026 PaulinoTech1"}],
             "files": files,
             "relationships": [{"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-StateGuard"}] +
                              [{"spdxElementId": "SPDXRef-StateGuard", "relationshipType": "CONTAINS", "relatedSpdxElement": f["SPDXID"]} for f in files]}

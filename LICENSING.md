@@ -1,9 +1,7 @@
-# Licensing status
+# Licensing
 
-No redistribution license has been selected for this project yet. Public source
-availability is not an open-source license grant. Do not describe the project as
-MIT, Apache-licensed, or otherwise licensed until the owner selects a license and
-the corresponding LICENSE file is added.
+This project is licensed under the MIT License. See LICENSE for the full text.
 
-The source SBOM records license information as NOASSERTION. License selection is
-pending; this file records the gap and does not grant new rights.
+Copyright (c) 2026 PaulinoTech1
+
+SPDX-License-Identifier: MIT

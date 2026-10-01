@@ -3,14 +3,14 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "State Guard source inventory",
-  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-d028f0419d418fb27b8b380b4dcb5d61abb837b7",
+  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-907b48716e6c76f6788d01edb47d0b07cf626578",
   "creationInfo": {
     "creators": [
       "Tool: State Guard source inventory generator"
     ],
-    "created": "2026-10-01T13:27:46Z"
+    "created": "2026-10-01T13:45:54Z"
   },
-  "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensing is unasserted pending owner selection.",
+  "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensed under MIT.",
   "packages": [
     {
       "name": "State Guard",
@@ -19,11 +19,11 @@
       "downloadLocation": "https://github.com/PaulinoTech1/state-gaurd",
       "filesAnalyzed": true,
       "packageVerificationCode": {
-        "packageVerificationCodeValue": "d028f0419d418fb27b8b380b4dcb5d61abb837b7"
+        "packageVerificationCodeValue": "907b48716e6c76f6788d01edb47d0b07cf626578"
       },
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "copyrightText": "NOASSERTION"
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     }
   ],
   "files": [
@@ -40,11 +40,11 @@
           "checksumValue": "d60f352d0db1404c70afb4bb8b2ca3fd1c610572aa40720e8a0b7baa7885418c"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
       "SPDXID": "SPDXRef-File-1",
@@ -59,11 +59,11 @@
           "checksumValue": "bff7542e21e44d70f9ad4df55c1483dce13ea8ca0e115fc224730aefd431259f"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
       "SPDXID": "SPDXRef-File-2",
@@ -78,11 +78,11 @@
           "checksumValue": "ae43ab1a12208c75d8b37cb8745eee24a6e6c9386d2138cde2db9338498cfe3f"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
       "SPDXID": "SPDXRef-File-3",
@@ -90,59 +90,78 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "519c906f7e293cdf19f7cf92f9e3c2c994630be8"
+          "checksumValue": "f33ffbb926960ce1f858ceea3afc75106ce8675f"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "85c31af58cb3da47f8006936767d8e18160bdebd25f4e6beeeaba0dad21af1e6"
+          "checksumValue": "1eeefcea0e7d57d60b7b76e4d4ff0523ac8a1f5f7ba61bb2a0a2a1bd5a32789f"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
       "SPDXID": "SPDXRef-File-4",
+      "fileName": "./LICENSE",
+      "checksums": [
+        {
+          "algorithm": "SHA1",
+          "checksumValue": "66a34ec141d04818eeee50f769b051d47b8a2a4c"
+        },
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "092c5166506edd96c8fdc7dd9b199f6b237b3c3adaf14991a9c7899366d5d446"
+        }
+      ],
+      "licenseConcluded": "MIT",
+      "licenseInfoInFiles": [
+        "MIT"
+      ],
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
+    },
+    {
+      "SPDXID": "SPDXRef-File-5",
       "fileName": "./LICENSING.md",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "74f213e2d356a8104db5ba11d4e4a96d7d6dbb57"
+          "checksumValue": "f0a93d2c986cace7d9685731bb3075fe167b8489"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "b236d29a8e7fcd177c213a85e5bea49871a0eb4a28e5de7f88989a3a85730382"
+          "checksumValue": "7bef8782015df4efc0994d3b9a7a732e470fe9a4e67569adae8160da22d52bc0"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-5",
+      "SPDXID": "SPDXRef-File-6",
       "fileName": "./README.md",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "7299211270683bfa02cc0efe41c9060eea242a5a"
+          "checksumValue": "0e48c78df1c09fda20c95123c1c9f8d450e315f2"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "bb1b0917e17649fc696054da52ea0de648a7b033bf41e373eef6227a075fc9f1"
+          "checksumValue": "d6dfa36cc01f3cdcb6bcaafdd7de79972fbb33e1825007831ecc996b1f493c29"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-6",
+      "SPDXID": "SPDXRef-File-7",
       "fileName": "./SECURITY.md",
       "checksums": [
         {
@@ -154,14 +173,14 @@
           "checksumValue": "ea5fdbadd5490bdac6576e33d184ae3acc6dd1f5fa2a8e7173570171802ff4b5"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-7",
+      "SPDXID": "SPDXRef-File-8",
       "fileName": "./examples/config.json",
       "checksums": [
         {
@@ -173,14 +192,14 @@
           "checksumValue": "61f3a7639ecf05d62ea5b85ae0089ebb9aa68586bfa1e0c5648fd7569e28f1d7"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-8",
+      "SPDXID": "SPDXRef-File-9",
       "fileName": "./examples/policy.json",
       "checksums": [
         {
@@ -192,33 +211,33 @@
           "checksumValue": "b5991789db2b0306aa142604d609e6e59af6c4436e8bd0fed5e32bf52756e2ad"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-9",
+      "SPDXID": "SPDXRef-File-10",
       "fileName": "./scripts/generate_sbom.py",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "3e81fb04c85166c45faf51eec4862c5163afc873"
+          "checksumValue": "c115bcec8db61917e53bb7a5d8de5f40f4946fc1"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "b3f218e1201f5a6f6aed582674ef41388663ba51880efe2e6830bd4fb054e64e"
+          "checksumValue": "0994de664ab0d4a392c09a86941f145d0f7f03b1798b9dbf8948696fc1723096"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-10",
+      "SPDXID": "SPDXRef-File-11",
       "fileName": "./state_guard.py",
       "checksums": [
         {
@@ -230,14 +249,14 @@
           "checksumValue": "00d605eadbc80dcd771bb83fdc6f12fadf6a639f0217b58c50523bf854110c55"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-11",
+      "SPDXID": "SPDXRef-File-12",
       "fileName": "./state_guard_gui.py",
       "checksums": [
         {
@@ -249,14 +268,14 @@
           "checksumValue": "559b2f82d1ba2eb74590bf11dd42785b161d3e0d98d8d590021a8474dec15efb"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-12",
+      "SPDXID": "SPDXRef-File-13",
       "fileName": "./state_guard_json.py",
       "checksums": [
         {
@@ -268,14 +287,14 @@
           "checksumValue": "87c5935b4fb22452ee74e5411b5eac3c8e781ccd31b10d1cc3418ba97124cdbe"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-13",
+      "SPDXID": "SPDXRef-File-14",
       "fileName": "./state_guard_storage.py",
       "checksums": [
         {
@@ -287,14 +306,14 @@
           "checksumValue": "61753cf86747ee97ed01f7f864d71a0c20ae9c457ab0f4270e89488999ce2e17"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-14",
+      "SPDXID": "SPDXRef-File-15",
       "fileName": "./tests/test_gui_lifecycle.py",
       "checksums": [
         {
@@ -306,14 +325,14 @@
           "checksumValue": "4adbe8b418beb9f83578d95e6d206fe985b051cba42457ee0b396521205e3cbc"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-15",
+      "SPDXID": "SPDXRef-File-16",
       "fileName": "./tests/test_remediation_security.py",
       "checksums": [
         {
@@ -325,14 +344,14 @@
           "checksumValue": "90c975141b83460ae1fc732c77b23040d66c1cd796e25338d7d3e14b1d466f49"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     },
     {
-      "SPDXID": "SPDXRef-File-16",
+      "SPDXID": "SPDXRef-File-17",
       "fileName": "./tests/test_state_guard.py",
       "checksums": [
         {
@@ -344,11 +363,11 @@
           "checksumValue": "df6ad2d00055ae6dd0ac01141dc8d9859700379d26166824115d085e692209f2"
         }
       ],
-      "licenseConcluded": "NOASSERTION",
+      "licenseConcluded": "MIT",
       "licenseInfoInFiles": [
-        "NOASSERTION"
+        "MIT"
       ],
-      "copyrightText": "NOASSERTION"
+      "copyrightText": "Copyright (c) 2026 PaulinoTech1"
     }
   ],
   "relationships": [
@@ -441,6 +460,11 @@
       "spdxElementId": "SPDXRef-StateGuard",
       "relationshipType": "CONTAINS",
       "relatedSpdxElement": "SPDXRef-File-16"
+    },
+    {
+      "spdxElementId": "SPDXRef-StateGuard",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-17"
     }
   ]
 }

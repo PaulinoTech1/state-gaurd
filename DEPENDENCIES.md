@@ -10,7 +10,7 @@ Keep those components supported and patched independently.
 `sbom.spdx.json` is a source-only SPDX 2.3 inventory with per-file hashes, regenerated
 by `python scripts/generate_sbom.py`. CI rejects a stale inventory. It does not
 enumerate installed runtime binaries, prove their integrity, or scan vulnerabilities.
-The inventory intentionally reports licensing as NOASSERTION pending owner selection.
+The inventory reports licensing as MIT.
 
 GitHub Actions dependencies are pinned to commit hashes. The Windows/Linux runner
 images and requested Python minor versions are mutable; pinning actions does not
