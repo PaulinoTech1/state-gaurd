@@ -27,6 +27,18 @@ class RemediationSecurityTests(unittest.TestCase):
     def apply(self):
         return guard.remediate(self.path, self.settings, True)
 
+    def create_windows_file_with_acl(self, path, sddl):
+        pointer = storage.w.LPVOID()
+        storage.checked(storage.from_sddl(sddl, 1, storage.ctypes.byref(pointer), None))
+        attributes = storage.SecurityAttributes(storage.ctypes.sizeof(storage.SecurityAttributes), pointer, False)
+        try:
+            handle = storage.create_file(str(path), 0xC0000000, 3, storage.ctypes.byref(attributes), 1, 0x00200000, None)
+            if handle == storage.ctypes.c_void_p(-1).value:
+                raise storage.ctypes.WinError(storage.ctypes.get_last_error())
+            storage.close_handle(handle)
+        finally:
+            storage.local_free(pointer)
+
     def test_exact_unmanaged_bytes_with_bom_crlf_and_escaping(self):
         raw = codecs.BOM_UTF8 + b'{\r\n  "debug" : true, "escaped": "\\u00e9", "number": 1.00e2, "nested": {"x": [1,2]}\r\n}\r\n'
         self.path.write_bytes(raw)
@@ -82,6 +94,8 @@ class RemediationSecurityTests(unittest.TestCase):
     def test_windows_alternate_stream_rejected(self):
         if os.name != "nt":
             self.skipTest("Windows stream check")
+        lock = self.path.with_name(self.path.name + ".state-guard.lock")
+        lock.write_bytes(b"\0")  # The inherited temporary-directory ACL is intentionally non-private.
         Path(str(self.path) + ":extra").write_bytes(b"unmanaged stream")
         with self.assertRaisesRegex(ValueError, "alternate data streams"):
             self.apply()
@@ -155,6 +169,24 @@ class RemediationSecurityTests(unittest.TestCase):
                 self.assertTrue(storage.private_acl(path))
             else:
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_windows_runner_acl_is_private(self):
+        if os.name != "nt":
+            self.skipTest("Windows ACL check")
+        candidate = self.path.with_name("runner-default.lock")
+        text = f"D:PAI(A;;FA;;;SY)(A;;FA;;;{storage.user_sid()})"
+        self.create_windows_file_with_acl(candidate, text)
+        with storage.open_regular(candidate, private=True):
+            pass
+
+    def test_windows_public_acl_reports_rejected_ace(self):
+        if os.name != "nt":
+            self.skipTest("Windows ACL check")
+        candidate = self.path.with_name("public.lock")
+        self.create_windows_file_with_acl(candidate, "D:P(A;;FA;;;WD)")
+        with self.assertRaisesRegex(ValueError, r"ACEs=.*trustee=S-1-1-0"):
+            with storage.open_regular(candidate, private=True):
+                pass
 
     def test_public_recovery_permissions_block_rollback(self):
         self.apply()

@@ -22,6 +22,15 @@ if os.name == "nt":
     class SecurityAttributes(ctypes.Structure):
         _fields_ = [("length", w.DWORD), ("descriptor", w.LPVOID), ("inherit", w.BOOL)]
 
+    class AclSizeInformation(ctypes.Structure):
+        _fields_ = [("ace_count", w.DWORD), ("bytes_in_use", w.DWORD), ("bytes_free", w.DWORD)]
+
+    class AceHeader(ctypes.Structure):
+        _fields_ = [("type", ctypes.c_ubyte), ("flags", ctypes.c_ubyte), ("size", w.WORD)]
+
+    class AccessAllowedAce(ctypes.Structure):
+        _fields_ = [("header", AceHeader), ("mask", w.DWORD), ("sid_start", w.DWORD)]
+
     def api(dll: Any, name: str, args: list[Any], result: Any = w.BOOL) -> Callable[..., Any]:
         """Bind a Windows API function with explicit argument and result types."""
         function = getattr(dll, name)
@@ -42,6 +51,9 @@ if os.name == "nt":
     get_owner = api(security, "GetSecurityDescriptorOwner", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
     get_group = api(security, "GetSecurityDescriptorGroup", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
     get_dacl = api(security, "GetSecurityDescriptorDacl", [w.LPVOID, ctypes.POINTER(w.BOOL), ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
+    get_control = api(security, "GetSecurityDescriptorControl", [w.LPVOID, ctypes.POINTER(w.WORD), ctypes.POINTER(w.DWORD)])
+    get_acl_information = api(security, "GetAclInformation", [w.LPVOID, w.LPVOID, w.DWORD, ctypes.c_int])
+    get_ace = api(security, "GetAce", [w.LPVOID, w.DWORD, ctypes.POINTER(w.LPVOID)])
     set_named_security = api(security, "SetNamedSecurityInfoW", [w.LPWSTR, ctypes.c_int, w.DWORD, w.LPVOID, w.LPVOID, w.LPVOID, w.LPVOID], w.DWORD)
     set_file_info = api(kernel, "SetFileInformationByHandle", [w.HANDLE, ctypes.c_int, w.LPVOID, w.DWORD])
     drive_type = api(kernel, "GetDriveTypeW", [w.LPCWSTR], w.UINT)
@@ -87,18 +99,57 @@ if os.name == "nt":
         checked(get_security(str(path), information, buffer, size, ctypes.byref(size)))
         return buffer
 
-    def private_acl(path: PathLike) -> bool:
-        """Return whether a file DACL permits only the user and SYSTEM."""
+    def _sid_text(pointer: w.LPVOID) -> str:
+        """Convert a Windows SID pointer to its stable string form."""
         value = w.LPWSTR()
-        checked(to_sddl(descriptor(path), 1, 4, ctypes.byref(value), None))
+        checked(sid_string(pointer, ctypes.byref(value)))
         try:
-            sid = user_sid()
-            return value.value in (
-                f"D:P(A;;FA;;;SY)(A;;FA;;;{sid})",
-                f"D:P(A;;FA;;;{sid})(A;;FA;;;SY)",
-            )
+            return value.value
         finally:
             local_free(ctypes.cast(value, w.HLOCAL))
+
+    def private_acl_details(path: PathLike) -> tuple[bool, str]:
+        """Validate a protected DACL and return sanitized ACE diagnostics."""
+        security_descriptor = descriptor(path)
+        control, revision = w.WORD(), w.DWORD()
+        checked(get_control(security_descriptor, ctypes.byref(control), ctypes.byref(revision)))
+        protected = bool(control.value & 0x1000)  # SE_DACL_PROTECTED
+        present, defaulted, dacl = w.BOOL(), w.BOOL(), w.LPVOID()
+        checked(get_dacl(security_descriptor, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)))
+        if not present or not dacl:
+            return False, f"protected={protected}; DACL is missing or null"
+
+        size = AclSizeInformation()
+        checked(get_acl_information(dacl, ctypes.byref(size), ctypes.sizeof(size), 2))  # AclSizeInformation
+        trusted = {user_sid(), "S-1-5-18"}  # current user and SYSTEM
+        deny_types = {1, 6, 10, 12}
+        entries: list[str] = []
+        allowed = protected
+        for index in range(size.ace_count):
+            pointer = w.LPVOID()
+            checked(get_ace(dacl, index, ctypes.byref(pointer)))
+            header = ctypes.cast(pointer, ctypes.POINTER(AceHeader)).contents
+            if header.flags & 0x08:  # INHERIT_ONLY_ACE
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},inherit-only")
+                continue
+            if header.type in deny_types:
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},deny")
+                continue
+            if header.type != 0:  # Fail closed for allow-object, callback, and unknown ACE layouts.
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},unsupported")
+                allowed = False
+                continue
+            ace = ctypes.cast(pointer, ctypes.POINTER(AccessAllowedAce)).contents
+            sid_pointer = w.LPVOID(pointer.value + AccessAllowedAce.sid_start.offset)
+            trustee = _sid_text(sid_pointer)
+            entries.append(f"type=allow,flags=0x{header.flags:02x},mask=0x{ace.mask:08x},trustee={trustee}")
+            if trustee not in trusted:
+                allowed = False
+        return allowed, f"protected={protected}; ACEs=[{'; '.join(entries)}]"
+
+    def private_acl(path: PathLike) -> bool:
+        """Return whether a file DACL grants access only to trusted principals."""
+        return private_acl_details(path)[0]
 
     def windows_open(
         path: PathLike,
@@ -204,11 +255,14 @@ def open_regular(
             raise ValueError("File identity changed while opening; stop concurrent file replacement and retry.")
         if private:
             if os.name == "nt":
-                allowed = private_acl(target)
+                allowed, details = private_acl_details(target)
             else:
                 allowed = info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) == 0o600
             if not allowed:
-                raise ValueError("Recovery or lock-file permissions are too broad; restrict access to the current user and retry.")
+                message = "Recovery or lock-file permissions are too broad; restrict access to the current user and retry."
+                if os.name == "nt":
+                    message += f" Found {details}. Expected a protected DACL with applicable allow ACEs only for the current user or SYSTEM."
+                raise ValueError(message)
         yield handle
 
 
@@ -251,6 +305,8 @@ def operation_lock(path: PathLike) -> Iterator[Path]:
     """Serialize cooperating State Guard operations for one config."""
     target = local_path(path).resolve(strict=True)
     writable_location(target)
+    if os.name == "nt":
+        validate_windows_file(target)
     lock = target.with_name(target.name + ".state-guard.lock")
     try:
         create_private(lock, b"\0")
@@ -276,28 +332,34 @@ def operation_lock(path: PathLike) -> Iterator[Path]:
     # Keep the stable inode: deleting the sidecar enables a split-lock race.
 
 
+def validate_windows_file(path: PathLike, info: os.stat_result | None = None) -> None:
+    """Reject Windows attributes and streams that remediation cannot preserve."""
+    if info is None:
+        info = Path(path).stat()
+    if getattr(info, "st_file_attributes", 0) & (0x1 | 0x800 | 0x4000):
+        raise ValueError("Windows remediation cannot preserve this read-only, compressed, or encrypted file; use a supported copy.")
+    stream = StreamInfo()
+    search = first_stream(str(path), 0, ctypes.byref(stream), 0)
+    if search == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        while True:
+            if stream.name != "::$DATA":
+                raise ValueError("Windows remediation cannot preserve alternate data streams; remove or migrate them before retrying.")
+            if not next_stream(search, ctypes.byref(stream)):
+                if ctypes.get_last_error() != 38:  # ERROR_HANDLE_EOF
+                    raise ctypes.WinError(ctypes.get_last_error())
+                break
+    finally:
+        close_search(search)
+
+
 @contextmanager
 def snapshot(path: PathLike) -> Iterator[tuple[bytes, os.stat_result]]:
     """Hold and return a verified snapshot suitable for guarded replacement."""
     with open_regular(path) as handle:
         if os.name == "nt":
-            info = os.fstat(handle.fileno())
-            if getattr(info, "st_file_attributes", 0) & (0x1 | 0x800 | 0x4000):
-                raise ValueError("Windows remediation cannot preserve this read-only, compressed, or encrypted file; use a supported copy.")
-            stream = StreamInfo()
-            search = first_stream(str(path), 0, ctypes.byref(stream), 0)
-            if search == ctypes.c_void_p(-1).value:
-                raise ctypes.WinError(ctypes.get_last_error())
-            try:
-                while True:
-                    if stream.name != "::$DATA":
-                        raise ValueError("Windows remediation cannot preserve alternate data streams; remove or migrate them before retrying.")
-                    if not next_stream(search, ctypes.byref(stream)):
-                        if ctypes.get_last_error() != 38:  # ERROR_HANDLE_EOF
-                            raise ctypes.WinError(ctypes.get_last_error())
-                        break
-            finally:
-                close_search(search)
+            validate_windows_file(path, os.fstat(handle.fileno()))
         if os.name != "nt":
             import fcntl
             try:
