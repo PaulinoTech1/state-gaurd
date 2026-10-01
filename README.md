@@ -1,4 +1,4 @@
-﻿# State Guard
+# State Guard
 
 Lightweight Windows and Linux endpoint audits, configuration drift detection,
 and guarded remediation, with a CLI and desktop interface. Python 3.10+ only;
@@ -49,21 +49,54 @@ A policy specifies exact top-level JSON values and types:
 ```
 
 Choose settings your application recognizes. The example keys do not configure
-Windows or Linux. Unlisted keys stay intact; writing normalizes JSON formatting.
-Reports show key names and statuses without disclosing configuration values.
+Windows or Linux. Exact types are intentional: `1`, `true`, and `"1"` differ.
+Reports include type names without disclosing configuration values. Existing-key edits
+preserve every byte outside changed values: whitespace, unrelated key order, number
+spellings, string escapes, UTF-8 BOM and line endings. UTF-8 JSON only; duplicate keys,
+nonstandard constants and files larger than 4 MiB are refused.
 
-Remediation previews by default. Applying creates an exclusive
-`<config>.state-guard.bak` recovery copy, refuses existing backups and linked files,
-checks for intervening changes, and verifies the resulting settings. When there is
-no drift, it writes nothing.
+Missing keys require `--allow-reformat`, which explicitly permits full JSON
+normalization (indentation, escaping, BOM, line endings and number spellings may
+change). The GUI has the same opt-in checkbox. This flag does not enable coercion.
+Reformatting is refused if a floating-point number would lose its numeric value;
+the opt-in permits formatting changes, not silent precision loss.
 
-Stop the application that owns the config before applying. There is no transactional
-locking or crash-atomic write guarantee: concurrent writers or interrupted writes
-can still damage a file. Recovery copies may contain secrets; keep the config
-directory private. Windows backups inherit directory access controls; Linux backups
-use mode 0600. To recover, stop the owning application and copy the backup over the
-config. Review and remove the backup before a later remediation. This prototype is
-not ready for unattended or production remediation.
+Remediation previews by default. Applying writes private recovery files before
+staging a complete replacement; the config is never truncated in place. A stable
+OS lock serializes State Guard operations. POSIX additionally takes an advisory
+config lock; Windows denies ordinary writers while holding the read snapshot.
+Stop the owning application: uncooperative POSIX writers, external renames and
+writes after replacement can still conflict. Use a trusted local directory.
+
+Recovery files are `<config>.state-guard.bak` and
+`<config>.state-guard.recovery.json`. Both are exclusively created and kept private:
+POSIX mode 0600 from creation; Windows protected user/SYSTEM DACLs. Config access
+controls are retained separately. An existing recovery copy or manifest blocks
+another change; no-drift apply remains a no-op. The `.state-guard.lock` sidecar
+stays on disk to avoid split locks; do not remove it during use.
+
+Preview or apply exact-byte recovery:
+
+```powershell
+py state_guard.py rollback --config demo-config.json
+py state_guard.py rollback --config demo-config.json --apply
+```
+
+The GUI also has **Preview rollback** and **Rollback?**. Rollback checks recovery
+hashes and refuses newer/unrecognized config edits or corrupt backups. It retains
+recovery files. Review and archive/remove both before a new remediation. Legacy
+backups without the new private manifest require manual inspection.
+
+Windows remediation requires a local fixed NTFS volume and Windows support for
+FileRenameInfoEx (modern Windows 10/11). Unsupported APIs/ACLs fail closed. Linux
+requires a local filesystem and a trusted directory chain; group/other-writable
+ancestors without sticky-bit protection are refused. Network filesystems are
+unsupported. File flushing and replacement reduce interruption risk but do not
+guarantee universal power-loss durability. A killed process can leave staging or
+recovery files for inspection. There is no unattended crash-recovery service or
+operating-system remediation. See [security limits](SECURITY.md).
+Windows read-only, compressed or encrypted files and files containing alternate
+data streams are refused rather than silently dropping those attributes or streams.
 
 ## Distinct from Lynis
 
@@ -83,5 +116,20 @@ python -m unittest discover -s tests -v
 ```
 
 The included CI workflow targets Windows and Linux with Python 3.10 and 3.13.
-Native collectors and desktop interactions still need acceptance testing on
-representative endpoints. Tests do not establish that an endpoint is secure.
+Actions are pinned to commit hashes. Native collectors and desktop interactions
+still need acceptance testing on representative endpoints. Tests do not establish
+that an endpoint is secure.
+
+[Dependency/release status](DEPENDENCIES.md) records external runtimes and the
+unsigned commit history. [Licensing is pending](LICENSING.md); no open-source
+license grant is claimed. The display name is State Guard; the existing GitHub slug
+`state-gaurd` is retained. The prototype does not claim safe OS remediation.
+
+A [source-only SPDX inventory](sbom.spdx.json) records file hashes and the absence
+of third-party Python packages. It does not inventory installed Python/Tcl/Tk/OS
+binaries or certify vulnerability status. Regenerate after source changes:
+
+```powershell
+python scripts/generate_sbom.py
+python scripts/generate_sbom.py --check
+```

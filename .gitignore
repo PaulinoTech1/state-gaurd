@@ -1,3 +1,6 @@
 __pycache__/
 *.state-guard.bak
+*.state-guard.recovery.json
+*.state-guard.lock
+*.state-guard-*.tmp
 demo-config.json
