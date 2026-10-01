@@ -1,5 +1,7 @@
 # State Guard
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Lightweight Windows and Linux endpoint audits, configuration drift detection,
 and guarded remediation, with a CLI and desktop interface. Python 3.10+ only;
 no third-party Python dependencies, background agent, server, or network calls.
@@ -110,6 +112,27 @@ such as Lynis; it does not match its coverage.
 
 Add `--json` for machine-readable output. Exit codes: **0** all checks pass,
 **1** drift detected (including preview), **2** error or unknown results.
+
+```powershell
+py state_guard.py audit --policy examples/policy.json --config demo-config.json --json
+```
+
+```json
+{
+  "platform": "Windows",
+  "action": "audit",
+  "version": "0.2.0",
+  "mode": "audit",
+  "checks": [
+    {
+      "check": "debug",
+      "status": "drift",
+      "expected_type": "bool",
+      "observed_type": "bool"
+    }
+  ]
+}
+```
 
 ```powershell
 python -m unittest discover -s tests -v
