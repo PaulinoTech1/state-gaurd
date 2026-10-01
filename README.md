@@ -24,10 +24,11 @@ Linux may require the distribution's `python3-tk` package and a graphical deskto
 The CLI does not require Tkinter. Start without administrator/root privileges.
 Unavailable collectors report UNKNOWN, never a successful check.
 
-Windows checks firewall profiles and Defender real-time protection. Linux checks
-full address space randomization (ASLR) and kernel pointer restrictions. These are
-limited indicators, not a complete security assessment. Defender may be unavailable
-on endpoints using another protection product.
+Windows checks firewall profiles plus Defender real-time, tamper, and cloud-delivered
+protection. Linux checks full address space randomization (ASLR), kernel pointer
+restrictions, and restricted kernel-message access. These are limited indicators, not
+a complete security assessment. Defender may be unavailable on endpoints using another
+protection product.
 
 ## Try drift detection and remediation
 
@@ -89,6 +90,15 @@ hashes and refuses newer/unrecognized config edits or corrupt backups. It retain
 recovery files. Review and archive/remove both before a new remediation. Legacy
 backups without the new private manifest require manual inspection.
 
+After the current config passes policy, preview and explicitly apply verified recovery
+cleanup. Cleanup checks the backup hash, manifest, and current config hash before it
+removes either recovery file:
+
+```powershell
+py state_guard.py recover --clean --policy examples/policy.json --config demo-config.json
+py state_guard.py recover --clean --policy examples/policy.json --config demo-config.json --apply
+```
+
 Windows remediation requires a local fixed NTFS volume and Windows support for
 FileRenameInfoEx (modern Windows 10/11). Unsupported APIs/ACLs fail closed. Linux
 requires a local filesystem and a trusted directory chain; group/other-writable
@@ -96,7 +106,8 @@ ancestors without sticky-bit protection are refused. Network filesystems are
 unsupported. File flushing and replacement reduce interruption risk but do not
 guarantee universal power-loss durability. A killed process can leave staging or
 recovery files for inspection. There is no unattended crash-recovery service or
-operating-system remediation. See [security limits](SECURITY.md).
+operating-system remediation. See the [threat model](THREAT_MODEL.md) and
+[security limits](SECURITY.md).
 Windows read-only, compressed or encrypted files and files containing alternate
 data streams are refused rather than silently dropping those attributes or streams.
 

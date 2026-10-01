@@ -12,7 +12,7 @@ from state_guard import __version__
 
 
 def build(created):
-    names = ["README.md", "LICENSING.md", "SECURITY.md", "DEPENDENCIES.md", ".gitignore", ".gitattributes"]
+    names = ["README.md", "LICENSING.md", "SECURITY.md", "THREAT_MODEL.md", "DEPENDENCIES.md", ".gitignore", ".gitattributes"]
     names += [p.name for p in ROOT.glob("state_guard*.py")]
     if (ROOT / "LICENSE").is_file():
         names.append("LICENSE")

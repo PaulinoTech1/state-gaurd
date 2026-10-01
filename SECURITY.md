@@ -40,11 +40,15 @@ they are not signatures and cannot defend against the owner modifying both files
 
 Rollback verifies the original-byte hash and accepts only current bytes matching
 the recorded original or intended applied state. It refuses newer edits instead of
-overwriting them. Recovery files remain after rollback; archive or remove them only
-after review and before another application of policy. Old prototype backups with
-no private manifest are not automatically trusted. A crash can leave a staged file
-or incomplete recovery preparation requiring inspection. Rollback is a command,
-not a background crash-recovery agent.
+overwriting them. Recovery cleanup requires the current config to pass policy and its
+hash to match the recorded original or applied state. Preview is the default; `--apply`
+is the explicit deletion confirmation. The backup is removed before the manifest so an
+interrupted cleanup leaves a blocking manifest rather than silently enabling another
+apply. Partial cleanup requires manual inspection. Old prototype backups with no private
+manifest are not automatically trusted. A crash can leave a staged file or incomplete
+recovery preparation requiring inspection. Rollback and cleanup are commands, not a
+background crash-recovery agent. See [THREAT_MODEL.md](THREAT_MODEL.md) for the system
+trust boundaries and residual risks.
 
 Default edits preserve bytes outside replaced top-level JSON values, including
 whitespace, encoding BOM, unrelated number/string spellings, and key order. Missing

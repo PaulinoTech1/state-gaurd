@@ -86,7 +86,7 @@ class RemediationSecurityTests(unittest.TestCase):
             self.assertFalse(guard.recovery_paths(self.path)[0].exists())
 
     def test_linux_collectors_pass_and_collection_errors_are_unknown(self):
-        with patch.object(guard.platform, "system", return_value="Linux"), patch.object(guard.Path, "read_text", side_effect=["2", "1"]):
+        with patch.object(guard.platform, "system", return_value="Linux"), patch.object(guard.Path, "read_text", side_effect=["2", "1", "1"]):
             self.assertTrue(all(c["status"] == "pass" for c in guard.endpoint_checks()))
         with patch.object(guard.platform, "system", return_value="Linux"), patch.object(guard.Path, "read_text", side_effect=OSError):
             self.assertTrue(all(c["status"] == "unknown" for c in guard.endpoint_checks()))
@@ -169,6 +169,40 @@ class RemediationSecurityTests(unittest.TestCase):
                 self.assertTrue(storage.private_acl(path))
             else:
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_recovery_cleanup_preview_and_apply(self):
+        self.apply()
+        recovery = guard.recovery_paths(self.path)
+        self.assertEqual(guard.clean_recovery(self.path, self.settings)[0]["status"], "drift")
+        self.assertTrue(all(path.exists() for path in recovery))
+        self.assertEqual(guard.clean_recovery(self.path, self.settings, True)[0]["status"], "pass")
+        self.assertFalse(any(path.exists() for path in recovery))
+        guard.remediate(self.path, {"debug": True}, True)
+        self.assertTrue(all(path.exists() for path in recovery))
+
+    def test_recovery_cleanup_refuses_policy_drift(self):
+        self.apply()
+        self.path.write_bytes(self.original)
+        recovery = guard.recovery_paths(self.path)
+        with self.assertRaisesRegex(ValueError, "pass policy"):
+            guard.clean_recovery(self.path, self.settings, True)
+        self.assertTrue(all(path.exists() for path in recovery))
+
+    def test_recovery_cleanup_refuses_unrecognized_config(self):
+        self.apply()
+        self.path.write_bytes(b'{"debug":false,"unmanaged":"newer"}')
+        recovery = guard.recovery_paths(self.path)
+        with self.assertRaisesRegex(ValueError, "newer or unrecognized"):
+            guard.clean_recovery(self.path, self.settings, True)
+        self.assertTrue(all(path.exists() for path in recovery))
+
+    def test_recovery_cleanup_refuses_corrupt_backup(self):
+        self.apply()
+        recovery = guard.recovery_paths(self.path)
+        recovery[0].write_bytes(b"corrupt")
+        with self.assertRaisesRegex(ValueError, "hash mismatch"):
+            guard.clean_recovery(self.path, self.settings, True)
+        self.assertTrue(all(path.exists() for path in recovery))
 
     def test_windows_runner_acl_is_private(self):
         if os.name != "nt":

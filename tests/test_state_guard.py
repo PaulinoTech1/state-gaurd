@@ -53,6 +53,25 @@ class StateGuardTests(unittest.TestCase):
         with patch.object(guard.platform, "system", return_value="Windows"), patch.object(guard, "command", side_effect=OSError):
             self.assertTrue(all(c["status"] == "unknown" for c in guard.endpoint_checks()))
 
+    def test_windows_collectors_include_tamper_and_cloud_protection(self):
+        values = ["true", "true", "true", "1"]
+        with patch.object(guard.platform, "system", return_value="Windows"), patch.object(guard, "command", side_effect=values) as collector:
+            checks = guard.endpoint_checks()
+        self.assertEqual([check["check"] for check in checks], [
+            "Firewall profiles enabled",
+            "Defender real-time protection",
+            "Defender tamper protection",
+            "Defender cloud-delivered protection",
+        ])
+        self.assertTrue(all(check["status"] == "pass" for check in checks))
+        self.assertIn("Get-MpPreference", collector.call_args_list[-1].args[0][-1])
+
+    def test_linux_collectors_include_dmesg_restriction(self):
+        with patch.object(guard.platform, "system", return_value="Linux"), patch.object(guard.Path, "read_text", side_effect=["2", "1", "1"]):
+            checks = guard.endpoint_checks()
+        self.assertEqual(checks[-1]["check"], "Kernel messages restricted")
+        self.assertEqual(checks[-1]["status"], "pass")
+
     def test_reports_hide_config_values(self):
         self.path.write_text('{"secret": "private"}')
         self.assertNotIn("private", json.dumps(guard.inspect_config(self.path, {"secret": "expected"})[2]))
