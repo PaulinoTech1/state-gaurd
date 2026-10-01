@@ -2,10 +2,12 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import platform
 import subprocess
 import sys
+from typing import Any, Callable, Sequence
 from state_guard_json import decode, render
 from state_guard_storage import (
     atomic_update, bounded_read, create_private, local_path, open_regular,
@@ -13,9 +15,13 @@ from state_guard_storage import (
 )
 
 __version__ = "0.2.0"
+Check = dict[str, Any]
+Settings = dict[str, str | int | bool]
+PathLike = str | os.PathLike[str]
 
 
-def format_check(check):
+def format_check(check: Check) -> str:
+    """Format one check without exposing its observed configuration value."""
     label = json.dumps(check["check"], ensure_ascii=False)
     text = f"{check['status'].upper():7} {label}"
     if "expected_type" in check and check["expected_type"] != check["observed_type"]:
@@ -25,7 +31,8 @@ def format_check(check):
     return text
 
 
-def command(args):
+def command(args: Sequence[str]) -> str:
+    """Run a fixed collector command and return trimmed stdout."""
     result = subprocess.run(args, capture_output=True, text=True, timeout=20)
     if result.returncode:
         detail = (result.stderr or "").strip().replace("\n", " ")
@@ -36,11 +43,12 @@ def command(args):
     return result.stdout.strip()
 
 
-def endpoint_checks():
+def endpoint_checks() -> list[Check]:
+    """Collect the small, read-only endpoint check set for this platform."""
     system = platform.system()
     checks = []
     if system == "Windows":
-        collectors = [
+        collectors: list[tuple[str, str, Callable[[Any], bool]]] = [
             ("Firewall profiles enabled", "@(Get-NetFirewallProfile | Select-Object -ExpandProperty Enabled) | ConvertTo-Json -Compress", lambda x: bool(x) and all(x if isinstance(x, list) else [x])),
             ("Defender real-time protection", "Get-MpComputerStatus | Select-Object -ExpandProperty RealTimeProtectionEnabled | ConvertTo-Json -Compress", lambda x: x is True),
         ]
@@ -51,8 +59,12 @@ def endpoint_checks():
                     checks.append({"check": name, "status": "unknown", "detail": "Collector returned no data; check installed components."})
                 else:
                     checks.append({"check": name, "status": "pass" if passes(value) else "drift", "observed": value})
-            except (OSError, ValueError, subprocess.TimeoutExpired):
-                checks.append({"check": name, "status": "unknown", "detail": "Unable to collect; check permissions or installed components."})
+            except ValueError as exc:
+                checks.append({"check": name, "status": "unknown", "detail": str(exc)})
+            except subprocess.TimeoutExpired:
+                checks.append({"check": name, "status": "unknown", "detail": "Collector timed out after 20 seconds; retry, then check PowerShell and security-product responsiveness."})
+            except OSError:
+                checks.append({"check": name, "status": "unknown", "detail": "Collector could not start; check that PowerShell is installed and permitted to run."})
     elif system == "Linux":
         for name, path, expected in [
             ("ASLR fully enabled", "/proc/sys/kernel/randomize_va_space", "2"),
@@ -63,31 +75,33 @@ def endpoint_checks():
                 passed = value in expected if isinstance(expected, tuple) else value == expected
                 checks.append({"check": name, "status": "pass" if passed else "drift", "observed": value})
             except OSError:
-                checks.append({"check": name, "status": "unknown", "detail": "Unable to read kernel setting."})
+                checks.append({"check": name, "status": "unknown", "detail": "Kernel setting could not be read; check procfs availability and read permissions."})
     else:
         checks.append({"check": "Supported platform", "status": "unknown", "detail": "Use Windows or Linux."})
     return checks
 
 
-def load_policy(path):
+def load_policy(path: PathLike) -> Settings:
+    """Load and validate a version 1 desired-state policy."""
     with open_regular(path) as handle:
         policy = decode(bounded_read(handle))
     if not isinstance(policy, dict) or set(policy) != {"version", "settings"} or type(policy["version"]) is not int or policy["version"] != 1:
-        raise ValueError("policy must contain version: 1 and settings")
+        raise ValueError("Policy must contain exactly 'version': 1 and 'settings'; review the policy structure.")
     settings = policy["settings"]
     if not isinstance(settings, dict) or not settings or any(not isinstance(k, str) or not k for k in settings):
-        raise ValueError("settings must be a nonempty object with nonempty keys")
+        raise ValueError("Policy 'settings' must be a nonempty object with nonempty string keys.")
     if any(type(v) not in (str, int, bool) for v in settings.values()):
-        raise ValueError("expected settings must be strings, integers, or booleans")
+        raise ValueError("Policy values must be strings, integers, or booleans; remove unsupported value types.")
     return settings
 
 
-def inspect_config(path, settings):
+def inspect_config(path: PathLike, settings: Settings) -> tuple[bytes, dict[str, Any], list[Check]]:
+    """Read a JSON config and compare its top-level values with a policy."""
     with open_regular(path) as handle:
         raw = bounded_read(handle)
     config = decode(raw)
     if not isinstance(config, dict):
-        raise ValueError("config must be a JSON object")
+        raise ValueError("Config must contain one top-level JSON object; arrays and scalar values are unsupported.")
     checks = []
     for key, desired in settings.items():
         matches = key in config and type(config[key]) is type(desired) and config[key] == desired
@@ -95,16 +109,24 @@ def inspect_config(path, settings):
     return raw, config, checks
 
 
-def recovery_paths(target):
+def recovery_paths(target: Path) -> tuple[Path, Path]:
+    """Return the recovery-copy and recovery-manifest paths for a config."""
     return (target.with_name(target.name + ".state-guard.bak"),
             target.with_name(target.name + ".state-guard.recovery.json"))
 
 
-def digest(raw):
+def digest(raw: bytes) -> str:
+    """Return the SHA-256 digest used to bind recovery state."""
     return hashlib.sha256(raw).hexdigest()
 
 
-def remediate(path, settings, apply=False, allow_reformat=False):
+def remediate(
+    path: PathLike,
+    settings: Settings,
+    apply: bool = False,
+    allow_reformat: bool = False,
+) -> list[Check]:
+    """Preview or apply policy values with verified recovery material."""
     raw, config, checks = inspect_config(path, settings)
     if all(c["status"] == "pass" for c in checks):
         return checks
@@ -114,42 +136,43 @@ def remediate(path, settings, apply=False, allow_reformat=False):
     with operation_lock(path) as target, snapshot(target) as (raw, info):
         config = decode(raw)
         if not isinstance(config, dict):
-            raise ValueError("config must be a JSON object")
+            raise ValueError("Config must contain one top-level JSON object; arrays and scalar values are unsupported.")
         updated = render(raw, config, settings, allow_reformat)
         if updated == raw:
             return inspect_config(path, settings)[2]
         backup, manifest = recovery_paths(target)
         if manifest.exists() or manifest.is_symlink():
-            raise FileExistsError("Recovery manifest already exists; review previous recovery files")
+            raise FileExistsError("Recovery manifest already exists; inspect or archive both recovery files before applying again.")
         create_private(backup, raw)
         with open_regular(backup, private=True) as handle:
             if bounded_read(handle) != raw:
-                raise ValueError("Recovery copy verification failed; replacement refused")
+                raise ValueError("Recovery copy verification failed; leave the config unchanged and check storage health and permissions.")
         metadata = {"version": 1, "original_sha256": digest(raw), "applied_sha256": digest(updated)}
         create_private(manifest, json.dumps(metadata).encode("utf-8"))
         sync_directory(target.parent)
         atomic_update(target, raw, updated, info)
         _, _, verified = inspect_config(path, settings)
         if any(c["status"] != "pass" for c in verified):
-            raise ValueError("verification failed; inspect config and recovery copy")
+            raise ValueError("Applied config did not match the policy; stop the owning application and inspect the config and recovery files.")
         return verified
 
 
-def rollback(path, apply=False):
+def rollback(path: PathLike, apply: bool = False) -> list[Check]:
     """Restore exact bytes only when current content matches the recorded state."""
     target = local_path(path).resolve(strict=True)
-    def prepare(raw):
+    def prepare(raw: bytes) -> bytes:
+        """Validate recovery material and return its original bytes."""
         backup, manifest = recovery_paths(target)
         with open_regular(backup, private=True) as handle:
             original = bounded_read(handle)
         with open_regular(manifest, private=True) as handle:
             metadata = decode(bounded_read(handle))
         if not isinstance(metadata, dict) or set(metadata) != {"version", "original_sha256", "applied_sha256"} or type(metadata["version"]) is not int or metadata["version"] != 1:
-            raise ValueError("Invalid recovery manifest")
+            raise ValueError("Recovery manifest is invalid; inspect it and the recovery copy before retrying.")
         if metadata["original_sha256"] != digest(original):
-            raise ValueError("Recovery copy hash mismatch; rollback refused")
+            raise ValueError("Recovery copy hash mismatch; rollback refused. Restore only from a separately verified backup.")
         if digest(raw) not in (metadata["original_sha256"], metadata["applied_sha256"]):
-            raise ValueError("Config has newer or unrecognized changes; rollback refused")
+            raise ValueError("Config has newer or unrecognized changes; preserve those changes and review them before rollback.")
         return original
     if not apply:
         with open_regular(target) as handle:
@@ -163,7 +186,8 @@ def rollback(path, apply=False):
     return [{"check": "Recovery to original bytes", "status": "pass" if apply or original == raw else "drift"}]
 
 
-def main(argv=None):
+def main(argv: Sequence[str] | None = None) -> int:
+    """Parse CLI arguments, run the requested action, and return an exit code."""
     parser = argparse.ArgumentParser(description="State Guard: small endpoint audits and explicit configuration drift checks.")
     parser.add_argument("action", nargs="?", default="audit", choices=["audit", "remediate", "rollback"])
     parser.add_argument("--version", action="version", version="State Guard " + __version__)

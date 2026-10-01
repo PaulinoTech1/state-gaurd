@@ -4,9 +4,11 @@ import os
 from pathlib import Path
 import shutil
 import stat
+from typing import Any, BinaryIO, Callable, Iterator
 import uuid
 
 MAX_BYTES = 4 * 1024 * 1024
+PathLike = str | os.PathLike[str]
 
 
 if os.name == "nt":
@@ -20,7 +22,17 @@ if os.name == "nt":
     class SecurityAttributes(ctypes.Structure):
         _fields_ = [("length", w.DWORD), ("descriptor", w.LPVOID), ("inherit", w.BOOL)]
 
-    def api(dll, name, args, result=w.BOOL):
+    class AclSizeInformation(ctypes.Structure):
+        _fields_ = [("ace_count", w.DWORD), ("bytes_in_use", w.DWORD), ("bytes_free", w.DWORD)]
+
+    class AceHeader(ctypes.Structure):
+        _fields_ = [("type", ctypes.c_ubyte), ("flags", ctypes.c_ubyte), ("size", w.WORD)]
+
+    class AccessAllowedAce(ctypes.Structure):
+        _fields_ = [("header", AceHeader), ("mask", w.DWORD), ("sid_start", w.DWORD)]
+
+    def api(dll: Any, name: str, args: list[Any], result: Any = w.BOOL) -> Callable[..., Any]:
+        """Bind a Windows API function with explicit argument and result types."""
         function = getattr(dll, name)
         function.argtypes, function.restype = args, result
         return function
@@ -36,10 +48,10 @@ if os.name == "nt":
     to_sddl = api(security, "ConvertSecurityDescriptorToStringSecurityDescriptorW", [w.LPVOID, w.DWORD, w.DWORD, ctypes.POINTER(w.LPWSTR), ctypes.POINTER(w.DWORD)])
     get_security = api(security, "GetFileSecurityW", [w.LPCWSTR, w.DWORD, w.LPVOID, w.DWORD, ctypes.POINTER(w.DWORD)])
     set_security = api(security, "SetFileSecurityW", [w.LPCWSTR, w.DWORD, w.LPVOID])
-    get_owner = api(security, "GetSecurityDescriptorOwner", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
-    get_group = api(security, "GetSecurityDescriptorGroup", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
     get_dacl = api(security, "GetSecurityDescriptorDacl", [w.LPVOID, ctypes.POINTER(w.BOOL), ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
-    set_named_security = api(security, "SetNamedSecurityInfoW", [w.LPWSTR, ctypes.c_int, w.DWORD, w.LPVOID, w.LPVOID, w.LPVOID, w.LPVOID], w.DWORD)
+    get_control = api(security, "GetSecurityDescriptorControl", [w.LPVOID, ctypes.POINTER(w.WORD), ctypes.POINTER(w.DWORD)])
+    get_acl_information = api(security, "GetAclInformation", [w.LPVOID, w.LPVOID, w.DWORD, ctypes.c_int])
+    get_ace = api(security, "GetAce", [w.LPVOID, w.DWORD, ctypes.POINTER(w.LPVOID)])
     set_file_info = api(kernel, "SetFileInformationByHandle", [w.HANDLE, ctypes.c_int, w.LPVOID, w.DWORD])
     drive_type = api(kernel, "GetDriveTypeW", [w.LPCWSTR], w.UINT)
     volume_info = api(kernel, "GetVolumeInformationW", [w.LPCWSTR, w.LPWSTR, w.DWORD, ctypes.POINTER(w.DWORD), ctypes.POINTER(w.DWORD), ctypes.POINTER(w.DWORD), w.LPWSTR, w.DWORD])
@@ -49,12 +61,14 @@ if os.name == "nt":
     next_stream = api(kernel, "FindNextStreamW", [w.HANDLE, ctypes.POINTER(StreamInfo)])
     close_search = api(kernel, "FindClose", [w.HANDLE])
 
-    def checked(result):
+    def checked(result: Any) -> Any:
+        """Return a successful Windows API result or raise its native error."""
         if not result:
             raise ctypes.WinError(ctypes.get_last_error())
         return result
 
-    def user_sid():
+    def user_sid() -> str:
+        """Return the current Windows user's SID string."""
         token = w.HANDLE()
         checked(open_token(get_process(), 0x0008, ctypes.byref(token)))
         try:
@@ -72,7 +86,8 @@ if os.name == "nt":
         finally:
             close_handle(token)
 
-    def descriptor(path, information=4):
+    def descriptor(path: PathLike, information: int = 4) -> Any:
+        """Read a Windows security descriptor for the requested information mask."""
         size = w.DWORD()
         get_security(str(path), information, None, 0, ctypes.byref(size))
         if not size.value:
@@ -81,19 +96,65 @@ if os.name == "nt":
         checked(get_security(str(path), information, buffer, size, ctypes.byref(size)))
         return buffer
 
-    def private_acl(path):
+    def _sid_text(pointer: w.LPVOID) -> str:
+        """Convert a Windows SID pointer to its stable string form."""
         value = w.LPWSTR()
-        checked(to_sddl(descriptor(path), 1, 4, ctypes.byref(value), None))
+        checked(sid_string(pointer, ctypes.byref(value)))
         try:
-            sid = user_sid()
-            return value.value in (
-                f"D:P(A;;FA;;;SY)(A;;FA;;;{sid})",
-                f"D:P(A;;FA;;;{sid})(A;;FA;;;SY)",
-            )
+            return value.value
         finally:
             local_free(ctypes.cast(value, w.HLOCAL))
 
-    def windows_open(path, create=False, writable=False, private=False):
+    def private_acl_details(path: PathLike) -> tuple[bool, str]:
+        """Validate a DACL trusted to the user, SYSTEM, and Administrators."""
+        security_descriptor = descriptor(path)
+        control, revision = w.WORD(), w.DWORD()
+        checked(get_control(security_descriptor, ctypes.byref(control), ctypes.byref(revision)))
+        protected = bool(control.value & 0x1000)  # SE_DACL_PROTECTED
+        present, defaulted, dacl = w.BOOL(), w.BOOL(), w.LPVOID()
+        checked(get_dacl(security_descriptor, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)))
+        if not present or not dacl:
+            return False, f"protected={protected}; DACL is missing or null"
+
+        size = AclSizeInformation()
+        checked(get_acl_information(dacl, ctypes.byref(size), ctypes.sizeof(size), 2))  # AclSizeInformation
+        trusted = {user_sid(), "S-1-5-18", "S-1-5-32-544"}  # user, SYSTEM, Administrators
+        deny_types = {1, 6, 10, 12}
+        entries: list[str] = []
+        allowed = True
+        for index in range(size.ace_count):
+            pointer = w.LPVOID()
+            checked(get_ace(dacl, index, ctypes.byref(pointer)))
+            header = ctypes.cast(pointer, ctypes.POINTER(AceHeader)).contents
+            if header.flags & 0x08:  # INHERIT_ONLY_ACE
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},inherit-only")
+                continue
+            if header.type in deny_types:
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},deny")
+                continue
+            if header.type != 0:  # Fail closed for allow-object, callback, and unknown ACE layouts.
+                entries.append(f"type={header.type},flags=0x{header.flags:02x},unsupported")
+                allowed = False
+                continue
+            ace = ctypes.cast(pointer, ctypes.POINTER(AccessAllowedAce)).contents
+            sid_pointer = w.LPVOID(pointer.value + AccessAllowedAce.sid_start.offset)
+            trustee = _sid_text(sid_pointer)
+            entries.append(f"type=allow,flags=0x{header.flags:02x},mask=0x{ace.mask:08x},trustee={trustee}")
+            if trustee not in trusted:
+                allowed = False
+        return allowed, f"protected={protected}; ACEs=[{'; '.join(entries)}]"
+
+    def private_acl(path: PathLike) -> bool:
+        """Return whether a file DACL grants access only to trusted principals."""
+        return private_acl_details(path)[0]
+
+    def windows_open(
+        path: PathLike,
+        create: bool = False,
+        writable: bool = False,
+        private: bool = False,
+    ) -> int:
+        """Open a Windows file with State Guard's sharing and optional ACL rules."""
         pointer = w.LPVOID()
         attributes = None
         if private:
@@ -108,7 +169,7 @@ if os.name == "nt":
             if handle == ctypes.c_void_p(-1).value:
                 error = ctypes.get_last_error()
                 if error in (80, 183):
-                    raise FileExistsError("Recovery or staging file already exists", str(path))
+                    raise FileExistsError("Recovery or staging file already exists; inspect existing recovery files before retrying.")
                 raise ctypes.WinError(error)
             try:
                 fd = msvcrt.open_osfhandle(handle, (os.O_RDWR if writable else os.O_RDONLY) | os.O_BINARY)
@@ -120,7 +181,8 @@ if os.name == "nt":
             if pointer:
                 local_free(pointer)
 
-    def windows_replace(source, target):
+    def windows_replace(source: PathLike, target: PathLike) -> None:
+        """Replace a Windows target by handle while its snapshot remains open."""
         # Rename the source by handle so the target can stay open denying writers.
         name = str(target)
         class RenameInfo(ctypes.Structure):
@@ -138,37 +200,45 @@ if os.name == "nt":
             close_handle(handle)
 
 
-def local_path(path):
+def local_path(path: PathLike) -> Path:
+    """Resolve an absolute local path and reject links and Windows reparse paths."""
     target = Path(os.path.abspath(path))
     if os.name == "nt" and (str(target).startswith("\\\\") or ":" in str(target)[2:]):
-        raise ValueError("Use a local file, not a network path or alternate data stream")
+        raise ValueError("A local file is required; move the config off network storage and remove alternate data-stream syntax.")
     for part in (target, *target.parents):
         if os.name == "nt" and part.name.endswith((".", " ")):
-            raise ValueError("Windows paths ending in dots or spaces are not supported")
+            raise ValueError("Windows path components cannot end in dots or spaces; rename the file or directory and retry.")
         try:
             info = part.lstat()
         except FileNotFoundError:
             continue
         if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
-            raise ValueError("Linked paths and Windows reparse points are not supported")
+            raise ValueError("Linked paths and Windows reparse points are unsupported; select the real local file.")
     return target
 
 
-def regular(info):
+def regular(info: os.stat_result) -> None:
+    """Require one regular file with a single hard link."""
     if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-        raise ValueError("Use a regular file without hard links")
+        raise ValueError("A single-link regular file is required; remove hard links or select the original file.")
 
 
-def bounded_read(handle):
+def bounded_read(handle: BinaryIO) -> bytes:
+    """Read a file from the start while enforcing the size limit."""
     handle.seek(0)
     raw = handle.read(MAX_BYTES + 1)
     if len(raw) > MAX_BYTES:
-        raise ValueError("File exceeds the 4 MiB limit")
+        raise ValueError("File exceeds the 4 MiB limit; reduce the config size before retrying.")
     return raw
 
 
 @contextmanager
-def open_regular(path, writable=False, private=False):
+def open_regular(
+    path: PathLike,
+    writable: bool = False,
+    private: bool = False,
+) -> Iterator[BinaryIO]:
+    """Open and identity-check a regular file without following links."""
     target = local_path(path)
     regular(target.lstat())
     if os.name == "nt":
@@ -179,18 +249,24 @@ def open_regular(path, writable=False, private=False):
         info = os.fstat(handle.fileno())
         regular(info)
         if (info.st_dev, info.st_ino) != (target.stat().st_dev, target.stat().st_ino):
-            raise ValueError("File identity changed while opening")
+            raise ValueError("File identity changed while opening; stop concurrent file replacement and retry.")
         if private:
             if os.name == "nt":
-                allowed = private_acl(target)
+                allowed, details = private_acl_details(target)
             else:
                 allowed = info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) == 0o600
             if not allowed:
-                raise ValueError("Recovery/lock file permissions are not private to this user")
+                if os.name == "nt":
+                    message = "Recovery or lock-file permissions are too broad; allow access only to the current user, SYSTEM, or BUILTIN\\Administrators and retry."
+                    message += f" Found {details}. DACL protection is optional."
+                else:
+                    message = "Recovery or lock-file permissions are too broad; restrict access to the current user and retry."
+                raise ValueError(message)
         yield handle
 
 
-def create_private(path, raw):
+def create_private(path: PathLike, raw: bytes) -> None:
+    """Create, flush, and close a new user-private file."""
     target = local_path(path)
     if os.name == "nt":
         fd = windows_open(target, create=True, writable=True, private=True)
@@ -208,24 +284,28 @@ def create_private(path, raw):
         raise
 
 
-def writable_location(target):
+def writable_location(target: Path) -> None:
+    """Require a supported local filesystem and trusted directory chain."""
     if os.name == "nt":
         filesystem = ctypes.create_unicode_buffer(32)
         checked(volume_info(target.anchor, None, 0, None, None, None, filesystem, 32))
         if drive_type(target.anchor) != 3 or filesystem.value != "NTFS":
-            raise ValueError("Remediation requires a local fixed NTFS volume on Windows")
+            raise ValueError("Windows remediation requires a local fixed NTFS volume; move the config to supported storage.")
     else:
         for directory in (target.parent, *target.parent.parents):
             info = directory.stat()
             # Sticky /tmp-style ancestors cannot rename a child owned by this user.
             if info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX:
-                raise ValueError("Remediation requires ancestors without group/other write access")
+                raise ValueError("A parent directory is group- or world-writable; restrict its permissions before remediation.")
 
 
 @contextmanager
-def operation_lock(path):
+def operation_lock(path: PathLike) -> Iterator[Path]:
+    """Serialize cooperating State Guard operations for one config."""
     target = local_path(path).resolve(strict=True)
     writable_location(target)
+    if os.name == "nt":
+        validate_windows_file(target)
     lock = target.with_name(target.name + ".state-guard.lock")
     try:
         create_private(lock, b"\0")
@@ -239,7 +319,7 @@ def operation_lock(path):
                 import fcntl
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as exc:
-            raise ValueError("Another State Guard operation holds the config lock") from exc
+            raise ValueError("Another State Guard operation holds the config lock; wait for it to finish and retry.") from exc
         try:
             yield target
         finally:
@@ -251,37 +331,45 @@ def operation_lock(path):
     # Keep the stable inode: deleting the sidecar enables a split-lock race.
 
 
+def validate_windows_file(path: PathLike, info: os.stat_result | None = None) -> None:
+    """Reject Windows attributes and streams that remediation cannot preserve."""
+    if info is None:
+        info = Path(path).stat()
+    if getattr(info, "st_file_attributes", 0) & (0x1 | 0x800 | 0x4000):
+        raise ValueError("Windows remediation cannot preserve this read-only, compressed, or encrypted file; use a supported copy.")
+    stream = StreamInfo()
+    search = first_stream(str(path), 0, ctypes.byref(stream), 0)
+    if search == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        while True:
+            if stream.name != "::$DATA":
+                raise ValueError("Windows remediation cannot preserve alternate data streams; remove or migrate them before retrying.")
+            if not next_stream(search, ctypes.byref(stream)):
+                if ctypes.get_last_error() != 38:  # ERROR_HANDLE_EOF
+                    raise ctypes.WinError(ctypes.get_last_error())
+                break
+    finally:
+        close_search(search)
+
+
 @contextmanager
-def snapshot(path):
+def snapshot(path: PathLike) -> Iterator[tuple[bytes, os.stat_result]]:
+    """Hold and return a verified snapshot suitable for guarded replacement."""
     with open_regular(path) as handle:
         if os.name == "nt":
-            info = os.fstat(handle.fileno())
-            if getattr(info, "st_file_attributes", 0) & (0x1 | 0x800 | 0x4000):
-                raise ValueError("Remediation does not support read-only, compressed or encrypted files")
-            stream = StreamInfo()
-            search = first_stream(str(path), 0, ctypes.byref(stream), 0)
-            if search == ctypes.c_void_p(-1).value:
-                raise ctypes.WinError(ctypes.get_last_error())
-            try:
-                while True:
-                    if stream.name != "::$DATA":
-                        raise ValueError("Remediation does not support alternate data streams")
-                    if not next_stream(search, ctypes.byref(stream)):
-                        if ctypes.get_last_error() != 38:  # ERROR_HANDLE_EOF
-                            raise ctypes.WinError(ctypes.get_last_error())
-                        break
-            finally:
-                close_search(search)
+            validate_windows_file(path, os.fstat(handle.fileno()))
         if os.name != "nt":
             import fcntl
             try:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except OSError as exc:
-                raise ValueError("Config is locked by another writer") from exc
+                raise ValueError("Another writer holds the config lock; stop the owning application and retry.") from exc
         yield bounded_read(handle), os.fstat(handle.fileno())
 
 
-def sync_directory(path):
+def sync_directory(path: PathLike) -> None:
+    """Flush a POSIX directory entry after replacement; no-op on Windows."""
     if os.name != "nt":
         fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
         try:
@@ -290,21 +378,29 @@ def sync_directory(path):
             os.close(fd)
 
 
-def assert_unchanged(path, raw, info):
+def assert_unchanged(path: PathLike, raw: bytes, info: os.stat_result) -> None:
+    """Refuse replacement if identity, metadata, or bytes changed."""
     with open_regular(path) as handle:
         current = os.fstat(handle.fileno())
         if (current.st_dev, current.st_ino, current.st_mtime_ns, current.st_ctime_ns) != (info.st_dev, info.st_ino, info.st_mtime_ns, info.st_ctime_ns) or bounded_read(handle) != raw:
-            raise ValueError("Config changed during preparation; replacement refused")
+            raise ValueError("Config changed during preparation; stop the owning application, review its changes, and retry.")
 
 
-def replace_file(source, target):
+def replace_file(source: PathLike, target: PathLike) -> None:
+    """Replace a target with the platform-specific atomic rename primitive."""
     if os.name == "nt":
         windows_replace(source, target)
     else:
         os.replace(source, target)
 
 
-def atomic_update(path, raw, updated, info):
+def atomic_update(
+    path: PathLike,
+    raw: bytes,
+    updated: bytes,
+    info: os.stat_result,
+) -> None:
+    """Stage, verify, and replace a config while preserving platform metadata."""
     target = local_path(path)
     temporary = target.with_name("." + target.name + ".state-guard-" + uuid.uuid4().hex + ".tmp")
     created = False
@@ -315,22 +411,11 @@ def atomic_update(path, raw, updated, info):
             # Preserve owner, group and protected/unprotected DACL. Fail closed if
             # this user cannot retain the original security descriptor.
             original = descriptor(target, 7)
-            acl_text = w.LPWSTR()
-            checked(to_sddl(original, 1, 4, ctypes.byref(acl_text), None))
-            try:
-                flag = 0x80000000 if acl_text.value.startswith("D:P") else 0x20000000
-            finally:
-                local_free(ctypes.cast(acl_text, w.HLOCAL))
-            owner, group, dacl = w.LPVOID(), w.LPVOID(), w.LPVOID()
-            defaulted, present = w.BOOL(), w.BOOL()
-            checked(get_owner(original, ctypes.byref(owner), ctypes.byref(defaulted)))
-            checked(get_group(original, ctypes.byref(group), ctypes.byref(defaulted)))
+            dacl, present, defaulted = w.LPVOID(), w.BOOL(), w.BOOL()
             checked(get_dacl(original, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)))
             if not present or not dacl:
-                raise ValueError("Config requires an explicit access-control list")
-            error = set_named_security(str(temporary), 1, 7 | flag, owner, group, dacl, None)
-            if error:
-                raise ctypes.WinError(error)
+                raise ValueError("Config has no explicit Windows access-control list; set one before remediation.")
+            checked(set_security(str(temporary), 7, original))
         else:
             os.chown(temporary, info.st_uid, info.st_gid)
             shutil.copystat(target, temporary, follow_symlinks=False)
@@ -341,7 +426,7 @@ def atomic_update(path, raw, updated, info):
                 os.setxattr(temporary, name, value, follow_symlinks=False)
         with open_regular(temporary, writable=True) as handle:
             if bounded_read(handle) != updated:
-                raise ValueError("Staging verification failed")
+                raise ValueError("Staging-file verification failed; check storage health and available space before retrying.")
             os.fsync(handle.fileno())
         assert_unchanged(target, raw, info)
         replace_file(temporary, target)
@@ -349,7 +434,7 @@ def atomic_update(path, raw, updated, info):
         sync_directory(target.parent)
         with open_regular(target) as handle:
             if bounded_read(handle) != updated:
-                raise ValueError("Post-replacement verification failed; use rollback after inspection")
+                raise ValueError("Replacement verification failed; stop the owning application, inspect both files, then use rollback.")
     finally:
         if created:
             temporary.unlink()

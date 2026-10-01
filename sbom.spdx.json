@@ -3,12 +3,12 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "State Guard source inventory",
-  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-98e538aa4f154cbdd0fb2c90770de80d6735e68e",
+  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-5a683b7c322dfea4bb4ecb8124bcb679417bd1fa",
   "creationInfo": {
     "creators": [
       "Tool: State Guard source inventory generator"
     ],
-    "created": "2026-10-01T13:51:19Z"
+    "created": "2026-10-01T15:21:13Z"
   },
   "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensed under MIT.",
   "packages": [
@@ -19,7 +19,7 @@
       "downloadLocation": "https://github.com/PaulinoTech1/state-gaurd",
       "filesAnalyzed": true,
       "packageVerificationCode": {
-        "packageVerificationCodeValue": "98e538aa4f154cbdd0fb2c90770de80d6735e68e"
+        "packageVerificationCodeValue": "5a683b7c322dfea4bb4ecb8124bcb679417bd1fa"
       },
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
@@ -147,11 +147,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "0e48c78df1c09fda20c95123c1c9f8d450e315f2"
+          "checksumValue": "d0f1954918a999d0571b79548fe4026eb0966f34"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "d6dfa36cc01f3cdcb6bcaafdd7de79972fbb33e1825007831ecc996b1f493c29"
+          "checksumValue": "3189e655ac73245c5398d69007ba991144f868093226c8d45111f4f945898466"
         }
       ],
       "licenseConcluded": "MIT",
@@ -242,11 +242,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "c282251acc7b87a32b7f3f2f455e140ffca3cb59"
+          "checksumValue": "b5d9a711c5369d44876e50559bd6335db4f38f32"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "d4a7f4dc7fce39dfe0cdff77494baad7e6783b81f7f5eccd055fa1233e30f812"
+          "checksumValue": "39be91f62a2a84caa4aa33975b7e9438965e98329aa7500e96ea8b5f8ee28085"
         }
       ],
       "licenseConcluded": "MIT",
@@ -280,11 +280,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "a0c78f420552becab526f35eebc1f8c7d439332c"
+          "checksumValue": "024554c7b824a37a26e56f2b02593f2bb6fb4cdb"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "3bb6554730cbcf03b8dd34e0194665353a18c0185c22d76bc9307201a9e5e21b"
+          "checksumValue": "fc629a4049c7776ee9c200eb56d0fb7d86fa822c34001de9ceddb3f267f9cc2c"
         }
       ],
       "licenseConcluded": "MIT",
@@ -299,11 +299,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "bcd3e716913479129bb7e0780d01fa1a7f58aeed"
+          "checksumValue": "074c2b8b696e51858a62bae6e847451d0288e9d3"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "61753cf86747ee97ed01f7f864d71a0c20ae9c457ab0f4270e89488999ce2e17"
+          "checksumValue": "75007413b3f2a4a9d61240bdb0f7f28f7805a861806b2cb19e59325b15950390"
         }
       ],
       "licenseConcluded": "MIT",
@@ -337,11 +337,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "fb85a85961016679175f7681b6616cedb7edd0af"
+          "checksumValue": "8269ecdeee6b41943cd648343fef625d45f62538"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "90c975141b83460ae1fc732c77b23040d66c1cd796e25338d7d3e14b1d466f49"
+          "checksumValue": "f6bbc07b31f6b8e9ed6264cf18b95da4f4b1fcf88eb1a18d92fb0ae2680b82fd"
         }
       ],
       "licenseConcluded": "MIT",
@@ -356,11 +356,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "082e160ce6565f3aa0dc50f0e26f79e9251eee7e"
+          "checksumValue": "44b04166a2af5c1cb981dc5d63641a962962ea43"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "4c5587f6b3102163d0684c0e310c44fd1eaf77251e7a5966d2833d0bc6efee10"
+          "checksumValue": "0c335364f2d764fd59f06a8be677c58d01e6dfc97fc0837070bedbc5a7fa2034"
         }
       ],
       "licenseConcluded": "MIT",

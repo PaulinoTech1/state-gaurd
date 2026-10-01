@@ -85,6 +85,27 @@ class StateGuardTests(unittest.TestCase):
         config = decode(raw)
         self.assertEqual(render(raw, config, {}), raw)
 
+    def test_whitespace_and_comments_fail_closed(self):
+        for raw in (b"   \r\n\t", b'{ "debug": true /* comment */ }'):
+            with self.subTest(raw=raw):
+                with self.assertRaises(ValueError):
+                    decode(raw)
+
+    def test_policy_bool_does_not_match_integer_config(self):
+        policy = self.path.with_name("policy.json")
+        policy.write_text('{"version": 1, "settings": {"enabled": true}}')
+        self.path.write_text('{"enabled": 1}')
+        settings = guard.load_policy(policy)
+        check = guard.inspect_config(self.path, settings)[2][0]
+        self.assertEqual(check["status"], "drift")
+        self.assertEqual(check["expected_type"], "bool")
+        self.assertEqual(check["observed_type"], "int")
+
+    def test_render_does_not_edit_nested_match_for_unchanged_top_level(self):
+        raw = b'{"enabled":false,"nested":{"enabled":true}}'
+        config = decode(raw)
+        self.assertEqual(render(raw, config, {"enabled": False}), raw)
+
 
 if __name__ == "__main__":
     unittest.main()

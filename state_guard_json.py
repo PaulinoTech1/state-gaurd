@@ -3,10 +3,14 @@ import codecs
 from decimal import Decimal
 import json
 import math
+from typing import Any
+
+Settings = dict[str, str | int | bool]
 
 
-def pairs(items):
-    result = {}
+def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Build an object while rejecting duplicate JSON keys."""
+    result: dict[str, Any] = {}
     for key, value in items:
         if key in result:
             raise ValueError("Duplicate JSON keys are not supported")
@@ -14,21 +18,24 @@ def pairs(items):
     return result
 
 
-def number(value):
+def number(value: str) -> float:
+    """Parse a finite JSON floating-point token."""
     parsed = float(value)
     if not math.isfinite(parsed):
         raise ValueError("Non-finite JSON numbers are not supported")
     return parsed
 
 
-def invalid_constant(value):
+def invalid_constant(value: str) -> None:
+    """Reject JSON constants that are outside the JSON standard."""
     raise ValueError("Nonstandard JSON constants are not supported")
 
 
 DECODER = json.JSONDecoder(object_pairs_hook=pairs, parse_float=number, parse_constant=invalid_constant)
 
 
-def decode(raw):
+def decode(raw: bytes) -> Any:
+    """Decode one strict UTF-8 JSON document."""
     try:
         text = raw.decode("utf-8-sig")
         value, end = DECODER.raw_decode(text, len(text) - len(text.lstrip(" \t\r\n")))
@@ -39,11 +46,18 @@ def decode(raw):
         raise ValueError("Use UTF-8 JSON with supported nesting") from exc
 
 
-def render(raw, config, settings, allow_reformat=False):
+def render(
+    raw: bytes,
+    config: dict[str, Any],
+    settings: Settings,
+    allow_reformat: bool = False,
+) -> bytes:
+    """Render policy changes while preserving unmanaged bytes by default."""
     if any(key not in config for key in settings) and not allow_reformat:
         raise ValueError("Policy adds missing keys; review and opt in with --allow-reformat")
     if allow_reformat:
-        def exact_number(token):
+        def exact_number(token: str) -> float:
+            """Parse a float only when reformatting preserves its numeric value."""
             parsed = number(token)
             if Decimal(token) != Decimal(str(parsed)):
                 raise ValueError("Full reformat would lose numeric precision; use existing-key edits or revise the config")
@@ -53,9 +67,10 @@ def render(raw, config, settings, allow_reformat=False):
         updated = dict(config, **settings)
         return (json.dumps(updated, indent=2, ensure_ascii=True, allow_nan=False) + "\n").encode("utf-8")
     text = raw.decode("utf-8-sig")
-    edits = []
+    edits: list[tuple[int, int, str]] = []
 
-    def skip_space(position):
+    def skip_space(position: int) -> int:
+        """Advance over JSON whitespace without consuming structural bytes."""
         while position < len(text) and text[position] in " \t\r\n":
             position += 1
         return position
