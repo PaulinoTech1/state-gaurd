@@ -1,0 +1,5 @@
+{
+  "debug": true,
+  "require_authentication": false,
+  "application": "demo"
+}
