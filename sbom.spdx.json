@@ -3,12 +3,12 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "State Guard source inventory",
-  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-4dc5e368183b822cddf21d4d893117fcc4204def",
+  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-64fd215e7212eb2483f5ae1a3037f5d0f1b44161",
   "creationInfo": {
     "creators": [
       "Tool: State Guard source inventory generator"
     ],
-    "created": "2026-10-01T15:07:03Z"
+    "created": "2026-10-01T15:10:25Z"
   },
   "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensed under MIT.",
   "packages": [
@@ -19,7 +19,7 @@
       "downloadLocation": "https://github.com/PaulinoTech1/state-gaurd",
       "filesAnalyzed": true,
       "packageVerificationCode": {
-        "packageVerificationCodeValue": "4dc5e368183b822cddf21d4d893117fcc4204def"
+        "packageVerificationCodeValue": "64fd215e7212eb2483f5ae1a3037f5d0f1b44161"
       },
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
@@ -299,11 +299,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "ff26478e7de09f8af6c83888c59529cc77297084"
+          "checksumValue": "62fac137944da1ed0552717fff7c245da23830d9"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "06ba7512a0c6132bc6b632ca022673911785a34081bc7a61b16c4c32efc090e3"
+          "checksumValue": "abc68aa29c46808525503dac69370aed76dbc7a0498f4664cb5f8216708dbca3"
         }
       ],
       "licenseConcluded": "MIT",

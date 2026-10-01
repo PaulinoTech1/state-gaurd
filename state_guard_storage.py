@@ -48,13 +48,10 @@ if os.name == "nt":
     to_sddl = api(security, "ConvertSecurityDescriptorToStringSecurityDescriptorW", [w.LPVOID, w.DWORD, w.DWORD, ctypes.POINTER(w.LPWSTR), ctypes.POINTER(w.DWORD)])
     get_security = api(security, "GetFileSecurityW", [w.LPCWSTR, w.DWORD, w.LPVOID, w.DWORD, ctypes.POINTER(w.DWORD)])
     set_security = api(security, "SetFileSecurityW", [w.LPCWSTR, w.DWORD, w.LPVOID])
-    get_owner = api(security, "GetSecurityDescriptorOwner", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
-    get_group = api(security, "GetSecurityDescriptorGroup", [w.LPVOID, ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
     get_dacl = api(security, "GetSecurityDescriptorDacl", [w.LPVOID, ctypes.POINTER(w.BOOL), ctypes.POINTER(w.LPVOID), ctypes.POINTER(w.BOOL)])
     get_control = api(security, "GetSecurityDescriptorControl", [w.LPVOID, ctypes.POINTER(w.WORD), ctypes.POINTER(w.DWORD)])
     get_acl_information = api(security, "GetAclInformation", [w.LPVOID, w.LPVOID, w.DWORD, ctypes.c_int])
     get_ace = api(security, "GetAce", [w.LPVOID, w.DWORD, ctypes.POINTER(w.LPVOID)])
-    set_named_security = api(security, "SetNamedSecurityInfoW", [w.LPWSTR, ctypes.c_int, w.DWORD, w.LPVOID, w.LPVOID, w.LPVOID, w.LPVOID], w.DWORD)
     set_file_info = api(kernel, "SetFileInformationByHandle", [w.HANDLE, ctypes.c_int, w.LPVOID, w.DWORD])
     drive_type = api(kernel, "GetDriveTypeW", [w.LPCWSTR], w.UINT)
     volume_info = api(kernel, "GetVolumeInformationW", [w.LPCWSTR, w.LPWSTR, w.DWORD, ctypes.POINTER(w.DWORD), ctypes.POINTER(w.DWORD), ctypes.POINTER(w.DWORD), w.LPWSTR, w.DWORD])
@@ -412,22 +409,11 @@ def atomic_update(
             # Preserve owner, group and protected/unprotected DACL. Fail closed if
             # this user cannot retain the original security descriptor.
             original = descriptor(target, 7)
-            acl_text = w.LPWSTR()
-            checked(to_sddl(original, 1, 4, ctypes.byref(acl_text), None))
-            try:
-                flag = 0x80000000 if acl_text.value.startswith("D:P") else 0x20000000
-            finally:
-                local_free(ctypes.cast(acl_text, w.HLOCAL))
-            owner, group, dacl = w.LPVOID(), w.LPVOID(), w.LPVOID()
-            defaulted, present = w.BOOL(), w.BOOL()
-            checked(get_owner(original, ctypes.byref(owner), ctypes.byref(defaulted)))
-            checked(get_group(original, ctypes.byref(group), ctypes.byref(defaulted)))
+            dacl, present, defaulted = w.LPVOID(), w.BOOL(), w.BOOL()
             checked(get_dacl(original, ctypes.byref(present), ctypes.byref(dacl), ctypes.byref(defaulted)))
             if not present or not dacl:
                 raise ValueError("Config has no explicit Windows access-control list; set one before remediation.")
-            error = set_named_security(str(temporary), 1, 7 | flag, owner, group, dacl, None)
-            if error:
-                raise ctypes.WinError(error)
+            checked(set_security(str(temporary), 7, original))
         else:
             os.chown(temporary, info.st_uid, info.st_gid)
             shutil.copystat(target, temporary, follow_symlinks=False)
