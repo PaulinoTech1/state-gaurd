@@ -3,12 +3,12 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "State Guard source inventory",
-  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-64fd215e7212eb2483f5ae1a3037f5d0f1b44161",
+  "documentNamespace": "https://github.com/PaulinoTech1/state-gaurd/spdx/0.2.0-5a683b7c322dfea4bb4ecb8124bcb679417bd1fa",
   "creationInfo": {
     "creators": [
       "Tool: State Guard source inventory generator"
     ],
-    "created": "2026-10-01T15:10:25Z"
+    "created": "2026-10-01T15:21:13Z"
   },
   "comment": "Source-only inventory. No third-party Python packages. Python, optional Tcl/Tk, operating-system components and CI runner images are externally supplied and not inventoried here. This is not a vulnerability scan or binary/runtime SBOM. Licensed under MIT.",
   "packages": [
@@ -19,7 +19,7 @@
       "downloadLocation": "https://github.com/PaulinoTech1/state-gaurd",
       "filesAnalyzed": true,
       "packageVerificationCode": {
-        "packageVerificationCodeValue": "64fd215e7212eb2483f5ae1a3037f5d0f1b44161"
+        "packageVerificationCodeValue": "5a683b7c322dfea4bb4ecb8124bcb679417bd1fa"
       },
       "licenseConcluded": "MIT",
       "licenseDeclared": "MIT",
@@ -299,11 +299,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "62fac137944da1ed0552717fff7c245da23830d9"
+          "checksumValue": "074c2b8b696e51858a62bae6e847451d0288e9d3"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "abc68aa29c46808525503dac69370aed76dbc7a0498f4664cb5f8216708dbca3"
+          "checksumValue": "75007413b3f2a4a9d61240bdb0f7f28f7805a861806b2cb19e59325b15950390"
         }
       ],
       "licenseConcluded": "MIT",
@@ -337,11 +337,11 @@
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "a24707a566d9881cf88a7d304d7afe9ba40f8def"
+          "checksumValue": "8269ecdeee6b41943cd648343fef625d45f62538"
         },
         {
           "algorithm": "SHA256",
-          "checksumValue": "c12498b3d24831ab1eae8ead4d13d990a931ae0bdbd8751793c986b5fc3d3a32"
+          "checksumValue": "f6bbc07b31f6b8e9ed6264cf18b95da4f4b1fcf88eb1a18d92fb0ae2680b82fd"
         }
       ],
       "licenseConcluded": "MIT",

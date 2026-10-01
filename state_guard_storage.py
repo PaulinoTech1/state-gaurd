@@ -106,7 +106,7 @@ if os.name == "nt":
             local_free(ctypes.cast(value, w.HLOCAL))
 
     def private_acl_details(path: PathLike) -> tuple[bool, str]:
-        """Validate a protected DACL and return sanitized ACE diagnostics."""
+        """Validate a DACL trusted to the user, SYSTEM, and Administrators."""
         security_descriptor = descriptor(path)
         control, revision = w.WORD(), w.DWORD()
         checked(get_control(security_descriptor, ctypes.byref(control), ctypes.byref(revision)))
@@ -118,10 +118,10 @@ if os.name == "nt":
 
         size = AclSizeInformation()
         checked(get_acl_information(dacl, ctypes.byref(size), ctypes.sizeof(size), 2))  # AclSizeInformation
-        trusted = {user_sid(), "S-1-5-18"}  # current user and SYSTEM
+        trusted = {user_sid(), "S-1-5-18", "S-1-5-32-544"}  # user, SYSTEM, Administrators
         deny_types = {1, 6, 10, 12}
         entries: list[str] = []
-        allowed = protected
+        allowed = True
         for index in range(size.ace_count):
             pointer = w.LPVOID()
             checked(get_ace(dacl, index, ctypes.byref(pointer)))
@@ -256,9 +256,11 @@ def open_regular(
             else:
                 allowed = info.st_uid == os.geteuid() and stat.S_IMODE(info.st_mode) == 0o600
             if not allowed:
-                message = "Recovery or lock-file permissions are too broad; restrict access to the current user and retry."
                 if os.name == "nt":
-                    message += f" Found {details}. Expected a protected DACL with applicable allow ACEs only for the current user or SYSTEM."
+                    message = "Recovery or lock-file permissions are too broad; allow access only to the current user, SYSTEM, or BUILTIN\\Administrators and retry."
+                    message += f" Found {details}. DACL protection is optional."
+                else:
+                    message = "Recovery or lock-file permissions are too broad; restrict access to the current user and retry."
                 raise ValueError(message)
         yield handle
 

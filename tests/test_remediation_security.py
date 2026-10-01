@@ -174,7 +174,7 @@ class RemediationSecurityTests(unittest.TestCase):
         if os.name != "nt":
             self.skipTest("Windows ACL check")
         candidate = self.path.with_name("runner-default.lock")
-        text = f"D:PAI(A;;FA;;;SY)(A;;FA;;;{storage.user_sid()})"
+        text = f"D:(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;{storage.user_sid()})"
         self.create_windows_file_with_acl(candidate, text)
         with storage.open_regular(candidate, private=True):
             pass
